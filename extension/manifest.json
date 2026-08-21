@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "DSA Pattern Finder - LeetCode Companion",
+  "version": "1.0.0",
+  "description": "Automatically analyzes LeetCode problems, detects algorithmic patterns, and provides Socratic reasoning questions.",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://leetcode.com/*",
+    "http://localhost:3000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "DSA Pattern Finder"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://leetcode.com/problems/*"
+      ],
+      "js": [
+        "content.js"
+      ]
+    }
+  ]
+}
