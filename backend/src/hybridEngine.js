@@ -3,6 +3,8 @@ import { scorePatterns } from "./patternScorer.js";
 import { buildDecision } from "./decisionEngine.js";
 import { mlClassifier } from "./ml/mlClassifier.js";
 
+import { PATTERN_RULES } from "./config/patternsConfig.js";
+
 /**
  * Hybrid Classifier Engine
  * Combines Heuristic Rule Scoring + TF-IDF ML Cosine Similarity
@@ -23,16 +25,7 @@ export function analyzeHybrid(problemText, heuristicWeight = 0.5) {
   const mlWeight = 1 - heuristicWeight;
   const combinedProbabilities = {};
 
-  const allPatterns = [
-    "Sliding Window",
-    "Two Pointers",
-    "Prefix Sum",
-    "Binary Search",
-    "Dynamic Programming",
-    "Graph",
-    "Backtracking",
-    "Greedy"
-  ];
+  const allPatterns = PATTERN_RULES.map(p => p.name);
 
   let topPattern = "Unknown";
   let maxCombinedProb = -1;

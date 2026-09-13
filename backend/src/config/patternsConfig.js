@@ -1,5 +1,5 @@
 /**
- * Declarative Pattern Rules Configuration
+ * Declarative Pattern Rules Configuration (14 Pattern Categories)
  */
 
 export const PATTERN_RULES = [
@@ -92,6 +92,40 @@ export const PATTERN_RULES = [
     ]
   },
   {
+    id: "fast_slow_pointers",
+    name: "Fast & Slow Pointers",
+    description: "Uses two pointers traversing at different speeds (1x and 2x) for cycle detection or midpoint identification.",
+    keywords: [
+      "linked list cycle",
+      "cycle detection",
+      "fast and slow",
+      "tortoise and hare",
+      "middle of the linked list",
+      "middle node",
+      "find cycle",
+      "start of cycle"
+    ],
+    requires: [
+      {
+        custom: (signals) => signals.text.includes("linked list") && (signals.text.includes("cycle") || signals.text.includes("middle")),
+        weight: 6,
+        reason: "Linked list cycle detection or middle node traversal phrasing"
+      },
+      {
+        custom: (signals) => signals.text.includes("fast and slow") || signals.text.includes("tortoise"),
+        weight: 5,
+        reason: "Fast and slow pointer algorithm keywords detected"
+      }
+    ],
+    penalties: [],
+    thinkingSteps: [
+      "Initialize slow = head and fast = head",
+      "Advance slow by 1 step (slow = slow.next) and fast by 2 steps (fast = fast.next.next)",
+      "If fast and slow pointers meet, a cycle is confirmed",
+      "For midpoint, when fast reaches null, slow is at the middle node"
+    ]
+  },
+  {
     id: "prefix_sum",
     name: "Prefix Sum",
     description: "Precomputes cumulative sums to query range sum queries in O(1) time.",
@@ -116,7 +150,7 @@ export const PATTERN_RULES = [
       "search",
       "find index",
       "binary search",
-      "target",
+      "search target",
       "sorted array",
       "log n",
       "logn",
@@ -125,7 +159,8 @@ export const PATTERN_RULES = [
       "peak",
       "first occurrence",
       "last occurrence",
-      "threshold"
+      "threshold",
+      "bisect"
     ],
     requires: [
       {
@@ -137,11 +172,6 @@ export const PATTERN_RULES = [
         custom: (signals) => !signals.isSorted && signals.searchWords?.length >= 2,
         weight: 4,
         reason: "Multiple search & target keywords detected"
-      },
-      {
-        custom: (signals) => !signals.isSorted && signals.searchWords?.length === 1,
-        weight: 2,
-        reason: "Search target term detected"
       }
     ],
     penalties: [
@@ -154,6 +184,132 @@ export const PATTERN_RULES = [
       "Identify search boundaries (low = start, high = end)",
       "Calculate mid pointer and test target condition",
       "Discard left or right half based on monotonicity"
+    ]
+  },
+  {
+    id: "monotonic_stack",
+    name: "Monotonic Stack",
+    description: "Maintains elements in monotonic order to find next greater or next smaller elements in O(N).",
+    keywords: [
+      "monotonic stack",
+      "next greater",
+      "next smaller",
+      "daily temperatures",
+      "histogram",
+      "largest rectangle",
+      "stock span",
+      "previous smaller"
+    ],
+    requires: [
+      {
+        custom: (signals) => signals.text.includes("next greater") || signals.text.includes("next smaller") || signals.text.includes("daily temperatures") || signals.text.includes("histogram"),
+        weight: 6,
+        reason: "Next greater/smaller element or histogram area phrasing detected"
+      },
+      {
+        custom: (signals) => signals.text.includes("stack") && (signals.text.includes("greater") || signals.text.includes("smaller")),
+        weight: 4,
+        reason: "Stack traversal with monotonic condition detected"
+      }
+    ],
+    penalties: [],
+    thinkingSteps: [
+      "Initialize an empty stack to store indices",
+      "Iterate through elements while maintaining monotonic increasing/decreasing invariant",
+      "Pop elements from stack when invariant is violated and compute results for popped elements",
+      "Push current element index onto stack"
+    ]
+  },
+  {
+    id: "heap_top_k",
+    name: "Heap / Top-K",
+    description: "Uses a Min-Heap or Max-Heap priority queue to track the top K largest or smallest elements in O(N log K).",
+    keywords: [
+      "kth largest",
+      "kth smallest",
+      "top k",
+      "most frequent",
+      "priority queue",
+      "min heap",
+      "max heap",
+      "median of stream"
+    ],
+    requires: [
+      {
+        custom: (signals) => signals.text.includes("kth largest") || signals.text.includes("kth smallest") || signals.text.includes("top k") || signals.text.includes("priority queue") || signals.text.includes("min heap"),
+        weight: 6,
+        reason: "Top-K extreme values or priority queue phrasing detected"
+      },
+      {
+        custom: (signals) => signals.mentionsK && (signals.text.includes("frequent") || signals.text.includes("largest") || signals.text.includes("smallest")),
+        weight: 4,
+        reason: "K size constraint paired with extreme/frequency goal"
+      }
+    ],
+    penalties: [],
+    thinkingSteps: [
+      "Maintain a Min-Heap of size K (or Max-Heap depending on problem)",
+      "Iterate through elements pushing into heap",
+      "When heap size exceeds K, pop the top element to retain only top K elements",
+      "Return top or remaining heap contents"
+    ]
+  },
+  {
+    id: "merge_intervals",
+    name: "Merge Intervals",
+    description: "Sorts intervals by start time to merge overlaps or schedule non-overlapping time slots.",
+    keywords: [
+      "merge intervals",
+      "overlapping intervals",
+      "interval overlap",
+      "meeting rooms",
+      "schedule overlap",
+      "insert interval",
+      "interval list"
+    ],
+    requires: [
+      {
+        custom: (signals) => signals.text.includes("interval") && (signals.text.includes("merge") || signals.text.includes("overlap") || signals.text.includes("meeting")),
+        weight: 6,
+        reason: "Interval range merging or schedule overlap phrasing detected"
+      }
+    ],
+    penalties: [],
+    thinkingSteps: [
+      "Sort intervals by start time",
+      "Initialize output array with first interval",
+      "Iterate through remaining intervals: if current start <= previous end, merge them (prev.end = max(prev.end, curr.end))",
+      "Otherwise, append current interval to output array"
+    ]
+  },
+  {
+    id: "union_find",
+    name: "Union-Find (Disjoint Set)",
+    description: "Tracks disjoint sets with Find-Parent and Union operations for connected components and graph cycles.",
+    keywords: [
+      "union find",
+      "disjoint set",
+      "connected components",
+      "provinces",
+      "redundant connection",
+      "find parent",
+      "path compression"
+    ],
+    requires: [
+      {
+        custom: (signals) => signals.text.includes("union find") || signals.text.includes("disjoint set") || signals.text.includes("provinces") || signals.text.includes("redundant connection"),
+        weight: 6,
+        reason: "Disjoint set or component union phrasing detected"
+      }
+    ],
+    penalties: [
+      { condition: (signals) => signals.text.includes("shortest path"), weight: -3 }
+    ],
+    thinkingSteps: [
+      "Initialize parent array where parent[i] = i and rank/size array",
+      "Implement Find(i) with path compression: find(i) = parent[i] == i ? i : (parent[i] = find(parent[i]))",
+      "Implement Union(i, j) by rank to attach smaller tree under larger tree root",
+      "Count unique root parents for connected components"
     ]
   },
   {
@@ -230,7 +386,12 @@ export const PATTERN_RULES = [
       "restore ip"
     ],
     requires: [
-      { signal: "backtrackingHints", weight: 5, reason: "Combinatorial generation / constraint search terms detected" }
+      { signal: "backtrackingHints", weight: 5, reason: "Combinatorial generation / constraint search terms detected" },
+      {
+        custom: (signals) => signals.constraints?.nUpperBound && signals.constraints.nUpperBound <= 20,
+        weight: 3,
+        reason: "N <= 20 upper bound confirms feasibility of combinatorial search"
+      }
     ],
     penalties: [],
     thinkingSteps: [

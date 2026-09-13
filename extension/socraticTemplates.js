@@ -1,5 +1,5 @@
 /**
- * Template-Based Socratic Reasoning Questions per Algorithmic Pattern
+ * Template-Based Socratic Reasoning Questions per Algorithmic Pattern (14 Patterns)
  */
 
 export const SOCRATIC_TEMPLATES = {
@@ -21,11 +21,36 @@ export const SOCRATIC_TEMPLATES = {
     "How will you handle duplicate values to ensure unique pairs/triplets?",
     "Would a fast and slow pointer approach work if searching for cycles?"
   ],
+  "Fast & Slow Pointers": [
+    "Why does advancing slow by 1 step and fast by 2 steps guarantee they will meet if a cycle exists?",
+    "When fast reaches null, why is slow located at the exact middle node of the linked list?",
+    "How do you find the exact node where a linked list cycle begins after detecting the collision point?"
+  ],
   "Sliding Window": [
     "Is the window size fixed ($k$) or dynamic based on a variable target constraint?",
     "What condition triggers expanding the `right` pointer vs shrinking the `left` pointer?",
     "What data structure (e.g. hash map, frequency array, monotonic queue) tracks window state in $O(1)$?",
     "How do you maintain the global maximum/minimum length while adjusting window boundaries?"
+  ],
+  "Monotonic Stack": [
+    "Is a monotonic increasing or monotonic decreasing stack required to resolve the next greater/smaller element?",
+    "Why does storing element indices instead of values in the stack allow computing subarray distances in $O(1)$?",
+    "How does popping elements upon invariant violation process unresolved elements in total $O(N)$ time?"
+  ],
+  "Heap / Top-K": [
+    "Why is a Min-Heap of size K optimal for tracking the Top K Largest elements?",
+    "What is the total time complexity $O(N \log K)$ compared to full sorting $O(N \log N)$?",
+    "When maintaining a dynamic stream median, how do you balance a Max-Heap (left half) and Min-Heap (right half)?"
+  ],
+  "Merge Intervals": [
+    "Why must intervals be sorted by start time before processing overlaps?",
+    "Under what exact condition `curr.start <= prev.end` do two intervals overlap?",
+    "How do you merge overlapping intervals into a single `[prev.start, max(prev.end, curr.end)]` range?"
+  ],
+  "Union-Find (Disjoint Set)": [
+    "How do Find-Parent with path compression and Union by rank optimize component connections to near $O(1)$ amortized time?",
+    "How does Union-Find detect redundant graph edges that form cycles?",
+    "What is the advantage of Union-Find over BFS/DFS for dynamic graph connectivity queries?"
   ],
   "Dynamic Programming": [
     "What does `dp[i]` or `dp[i][j]` represent in plain English?",

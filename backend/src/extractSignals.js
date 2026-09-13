@@ -1,10 +1,13 @@
 import { PATTERN_RULES } from "./config/patternsConfig.js";
+import { detectConstraints } from "./extraction/constraintDetector.js";
 
 export function extractSignals(problemText) {
   const text = problemText.toLowerCase();
 
   const signals = {
     text,
+
+    constraints: detectConstraints(problemText),
 
     hasArray:
       text.includes("array") ||

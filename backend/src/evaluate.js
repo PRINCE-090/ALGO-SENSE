@@ -4,19 +4,11 @@ import { scorePatterns } from "./patternScorer.js";
 import { buildDecision } from "./decisionEngine.js";
 import { mlClassifier } from "./ml/mlClassifier.js";
 import { analyzeHybrid } from "./hybridEngine.js";
+import { PATTERN_RULES } from "./config/patternsConfig.js";
 import { performance } from "perf_hooks";
 
 export function evaluateEngine(predictFn) {
-  const patternsList = [
-    "Sliding Window",
-    "Two Pointers",
-    "Prefix Sum",
-    "Binary Search",
-    "Dynamic Programming",
-    "Graph",
-    "Backtracking",
-    "Greedy"
-  ];
+  const patternsList = PATTERN_RULES.map(p => p.name);
 
   const stats = {};
   for (const p of patternsList) {
@@ -29,15 +21,17 @@ export function evaluateEngine(predictFn) {
   const start = performance.now();
   for (const sample of EVALUATION_DATASET) {
     const predicted = predictFn(sample.text);
-    const actual = sample.pattern;
+    const acceptable = sample.acceptable || [sample.pattern];
 
-    const isMatch = predicted === actual;
+    const isMatch = acceptable.includes(predicted);
 
     if (isMatch) {
       totalCorrect++;
-      if (stats[actual]) stats[actual].tp++;
+      const targetPattern = acceptable[0];
+      if (stats[targetPattern]) stats[targetPattern].tp++;
     } else {
-      if (stats[actual]) stats[actual].fn++;
+      const targetPattern = acceptable[0];
+      if (stats[targetPattern]) stats[targetPattern].fn++;
       if (stats[predicted]) stats[predicted].fp++;
     }
   }
