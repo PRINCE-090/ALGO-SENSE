@@ -4,6 +4,8 @@ import { scorePatterns } from "./patternScorer.js";
 import { buildDecision } from "./decisionEngine.js";
 import { fetchProblemFromUrl } from "./fetchProblem.js";
 import { analyzeHybrid } from "./hybridEngine.js";
+import { reviewSolution } from "./services/aiReviewService.js";
+import { fetchAcceptedSubmission } from "./fetchSubmission.js";
 import cors from "cors";
 
 const app = express();
@@ -83,6 +85,43 @@ app.post("/analyze", async (req, res) => {
         decision,
         hybrid
       }
+    });
+  } catch (err) {
+    const statusCode = err.statusCode || 500;
+    res.status(statusCode).json({ error: err.message });
+  }
+});
+
+app.post("/review", async (req, res) => {
+  let { code, language = "cpp", problemTitle = "", problemDescription = "", pattern = "", slug, sessionCookie } = req.body;
+
+  try {
+    let submissionInfo = null;
+
+    // If code is not explicitly sent, attempt to fetch user's accepted submission via LeetCode GraphQL
+    if (!code && slug) {
+      submissionInfo = await fetchAcceptedSubmission({ slug, sessionCookie });
+      code = submissionInfo.code;
+      language = submissionInfo.language || language;
+    }
+
+    if (!code || typeof code !== "string" || !code.trim()) {
+      return res.status(400).json({
+        error: "Solution code or LeetCode problem slug required"
+      });
+    }
+
+    const review = await reviewSolution({
+      code,
+      language,
+      problemTitle,
+      problemDescription,
+      pattern
+    });
+
+    res.json({
+      submission: submissionInfo,
+      review
     });
   } catch (err) {
     const statusCode = err.statusCode || 500;

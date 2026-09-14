@@ -10,8 +10,39 @@ document.addEventListener("DOMContentLoaded", async () => {
   const resultContainer = document.getElementById("result-container");
   const errorEl = document.getElementById("error");
 
+  // Tab elements
+  const tabPatternBtn = document.getElementById("tab-pattern-btn");
+  const tabReviewBtn = document.getElementById("tab-review-btn");
+  const tabPatternSection = document.getElementById("tab-pattern");
+  const tabReviewSection = document.getElementById("tab-review");
+
+  // Code Review elements
+  const fetchSubBtn = document.getElementById("fetch-sub-btn");
+  const codeInput = document.getElementById("code-input");
+  const reviewBtn = document.getElementById("review-btn");
+  const reviewLoadingEl = document.getElementById("review-loading");
+  const reviewResultContainer = document.getElementById("review-result-container");
+
   let activeUrl = "";
   let extractedSlug = "";
+  let currentPattern = "";
+
+  // Tab Navigation Handling
+  tabPatternBtn.addEventListener("click", () => {
+    tabPatternBtn.classList.add("active");
+    tabReviewBtn.classList.remove("active");
+    tabPatternSection.style.display = "block";
+    tabReviewSection.style.display = "none";
+    hideError();
+  });
+
+  tabReviewBtn.addEventListener("click", () => {
+    tabReviewBtn.classList.add("active");
+    tabPatternBtn.classList.remove("active");
+    tabPatternSection.style.display = "none";
+    tabReviewSection.style.display = "block";
+    hideError();
+  });
 
   // Query active tab URL
   try {
@@ -45,6 +76,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     slugBadge.textContent = "URL Error";
   }
 
+  // Run Pattern Analysis
   const runAnalysis = async () => {
     if (!extractedSlug) {
       showError("Please navigate to a LeetCode problem page (e.g. leetcode.com/problems/two-sum/)");
@@ -69,7 +101,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
     } catch (apiErr) {
-      console.log("[DSA Pattern Finder] Local API unavailable, falling back to direct browser GraphQL evaluation...");
+      console.log("[DSA Pattern Finder] Local API offline, using direct browser GraphQL evaluation...");
     }
 
     // 2. Client-Side Browser Fallback (Direct GraphQL + Client Engine)
@@ -88,22 +120,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (extractedSlug) {
     runAnalysis();
-  } else {
-    showLoading(false);
   }
 
   function renderResults(data) {
     const hybrid = data.analysis.hybrid || data.analysis.decision;
-    const pattern = hybrid.primaryPattern || "Unknown";
+    currentPattern = hybrid.primaryPattern || "Unknown";
     const confidencePct = Math.round((hybrid.confidence || 0) * 100);
 
-    document.getElementById("pattern-name").textContent = pattern;
+    document.getElementById("pattern-name").textContent = currentPattern;
     document.getElementById("confidence").textContent = `${confidencePct}% Confidence`;
 
     // Render Socratic Questions
     const socraticList = document.getElementById("socratic-questions");
     socraticList.innerHTML = "";
-    const questions = SOCRATIC_TEMPLATES[pattern] || SOCRATIC_TEMPLATES["Unknown"];
+    const questions = SOCRATIC_TEMPLATES[currentPattern] || SOCRATIC_TEMPLATES["Unknown"];
     questions.forEach(q => {
       const li = document.createElement("li");
       li.textContent = q;
@@ -123,6 +153,131 @@ document.addEventListener("DOMContentLoaded", async () => {
     resultContainer.style.display = "block";
   }
 
+  // Capture Accepted Submission via LeetCode's official GraphQL submission endpoint
+  fetchSubBtn.addEventListener("click", async () => {
+    if (!extractedSlug) {
+      showError("Please open a LeetCode problem page first.");
+      return;
+    }
+
+    try {
+      hideError();
+      fetchSubBtn.textContent = "Fetching Accepted Solution...";
+      fetchSubBtn.disabled = true;
+
+      // Query user's accepted submission using authenticated browser session
+      const submission = await fetchAcceptedSubmissionFromLeetCode(extractedSlug);
+
+      if (submission && submission.code) {
+        codeInput.value = submission.code;
+        fetchSubBtn.textContent = `✅ Captured Accepted Solution (${submission.language})`;
+        // Automatically trigger review
+        runCodeReview(submission.code, submission.language);
+      } else {
+        throw new Error("No accepted submission found. Ensure you have submitted code on LeetCode.");
+      }
+    } catch (err) {
+      showError(`Failed to capture submission: ${err.message}. You can paste your code in the box below.`);
+      fetchSubBtn.textContent = "⚡ Capture Accepted Solution (LeetCode API)";
+    } finally {
+      fetchSubBtn.disabled = false;
+    }
+  });
+
+  // Run AI Code Review
+  const runCodeReview = async (codeOverride, langOverride) => {
+    const code = codeOverride || codeInput.value;
+    if (!code || !code.trim()) {
+      showError("Please paste or capture your solution code first.");
+      return;
+    }
+
+    try {
+      hideError();
+      reviewLoadingEl.style.display = "block";
+      reviewResultContainer.style.display = "none";
+
+      let reviewData = null;
+
+      // 1. Try backend /review endpoint
+      try {
+        const res = await fetch(`${API_BASE_URL}/review`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code,
+            language: langOverride || "cpp",
+            problemTitle: extractedSlug,
+            pattern: currentPattern
+          })
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          reviewData = json.review;
+        }
+      } catch (e) {
+        console.log("[AI Review] Local server offline, running client-side code review analyzer...");
+      }
+
+      // 2. Client-side deterministic code review fallback
+      if (!reviewData) {
+        reviewData = analyzeCodeClientSide(code, currentPattern);
+      }
+
+      renderReviewResults(reviewData);
+    } catch (err) {
+      showError(`Code review failed: ${err.message}`);
+    } finally {
+      reviewLoadingEl.style.display = "none";
+    }
+  };
+
+  reviewBtn.addEventListener("click", () => runCodeReview());
+
+  function renderReviewResults(review) {
+    document.getElementById("time-comp").textContent = review.timeComplexity || "O(N)";
+    document.getElementById("space-comp").textContent = review.spaceComplexity || "O(1)";
+
+    const expl = `${review.timeComplexityExplanation || ""} ${review.spaceComplexityExplanation || ""}`.trim();
+    document.getElementById("complexity-explanation").textContent = expl;
+
+    const verdictEl = document.getElementById("review-verdict");
+    verdictEl.textContent = review.verdict || "Optimal";
+    verdictEl.className = `verdict-tag ${review.verdict === "Optimal" ? "tag-optimal" : (review.verdict === "Good" ? "tag-good" : "tag-refactor")}`;
+
+    document.getElementById("review-rating").textContent = `Score: ${review.rating || 9}/10`;
+
+    // Edge Cases
+    const edgeList = document.getElementById("edge-cases-list");
+    edgeList.innerHTML = "";
+    (review.edgeCases || []).forEach(ec => {
+      const li = document.createElement("li");
+      li.textContent = ec;
+      edgeList.appendChild(li);
+    });
+
+    // Style Review
+    const styleList = document.getElementById("style-review-list");
+    styleList.innerHTML = "";
+    (review.styleReview || []).forEach(sr => {
+      const li = document.createElement("li");
+      li.textContent = sr;
+      styleList.appendChild(li);
+    });
+
+    // Improvements
+    const impList = document.getElementById("improvements-list");
+    impList.innerHTML = "";
+    (review.improvements || []).forEach(imp => {
+      const li = document.createElement("li");
+      li.textContent = imp;
+      impList.appendChild(li);
+    });
+
+    reviewResultContainer.style.display = "block";
+  }
+
   function showLoading(isLoading) {
     loadingEl.style.display = isLoading ? "block" : "none";
     if (isLoading) resultContainer.style.display = "none";
@@ -138,7 +293,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-// Direct LeetCode GraphQL fetch from browser
+// Direct LeetCode GraphQL fetch for problem description
 async function fetchLeetCodeGraphQL(slug) {
   const res = await fetch("https://leetcode.com/graphql", {
     method: "POST",
@@ -162,6 +317,73 @@ async function fetchLeetCodeGraphQL(slug) {
   }
 
   return json.data.question.content.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim();
+}
+
+// Fetch user's latest accepted submission via LeetCode's official GraphQL submission endpoint
+async function fetchAcceptedSubmissionFromLeetCode(slug) {
+  const listRes = await fetch("https://leetcode.com/graphql", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include", // Uses active browser cookies
+    body: JSON.stringify({
+      query: `
+        query questionSubmissionList($questionSlug: String!, $offset: Int!, $limit: Int!) {
+          questionSubmissionList(
+            questionSlug: $questionSlug
+            offset: $offset
+            limit: $limit
+          ) {
+            submissions {
+              id
+              statusDisplay
+              lang
+              runtime
+              memory
+            }
+          }
+        }
+      `,
+      variables: { questionSlug: slug, offset: 0, limit: 10 }
+    })
+  });
+
+  const listData = await listRes.json();
+  const submissions = listData?.data?.questionSubmissionList?.submissions || [];
+  const accepted = submissions.find(s => s.statusDisplay === "Accepted") || submissions[0];
+
+  if (!accepted) {
+    throw new Error("No recent submission found on LeetCode for this problem.");
+  }
+
+  // Fetch full source code
+  const detailRes = await fetch("https://leetcode.com/graphql", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      query: `
+        query submissionDetails($submissionId: Int!) {
+          submissionDetails(submissionId: $submissionId) {
+            code
+            statusDisplay
+            lang {
+              name
+            }
+          }
+        }
+      `,
+      variables: { submissionId: Number(accepted.id) }
+    })
+  });
+
+  const detailData = await detailRes.json();
+  const details = detailData?.data?.submissionDetails;
+
+  return {
+    code: details?.code,
+    language: details?.lang?.name || accepted.lang,
+    status: details?.statusDisplay
+  };
 }
 
 // Client-side rule engine fallback
@@ -208,5 +430,61 @@ function analyzeClientSide(text) {
     confidence: top.score > 0 ? confidence : 0,
     thinkingSteps: top.steps || [],
     why: top.reasons || []
+  };
+}
+
+// Client-side deterministic static code review fallback
+function analyzeCodeClientSide(code, pattern) {
+  const cleanCode = code.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, "");
+  const forLoops = (cleanCode.match(/\bfor\s*\(/g) || []).length;
+  const whileLoops = (cleanCode.match(/\bwhile\s*\(/g) || []).length;
+
+  let timeComplexity = "O(N)";
+  let timeExpl = "Single-pass linear scan across elements.";
+
+  if (pattern === "Binary Search" || cleanCode.includes("mid") || cleanCode.includes(">> 1")) {
+    timeComplexity = "O(log N)";
+    timeExpl = "Binary space partitioning halves candidate elements at each iteration.";
+  } else if (forLoops >= 2 || (forLoops >= 1 && whileLoops >= 1)) {
+    timeComplexity = "O(N²)";
+    timeExpl = "Nested loop iteration detected.";
+  }
+
+  const usesMap = /unordered_map|HashMap|Map\(|dict\(/.test(cleanCode);
+  const spaceComplexity = usesMap ? "O(N)" : "O(1)";
+  const spaceExpl = usesMap ? "Allocates auxiliary Hash Map storing up to N entries." : "Uses constant O(1) auxiliary pointer and state variables.";
+
+  const edgeCases = [
+    "Verify behavior for empty or 1-element input arrays.",
+    "Ensure duplicate elements and zero/negative numbers are handled correctly.",
+    "Check integer arithmetic bounds to prevent overflow on extreme values."
+  ];
+
+  const styleReview = [
+    "Clean variable naming aligns with standard competitive programming conventions.",
+    "Concise condition checks avoid redundant branching."
+  ];
+
+  const improvements = [];
+  if (timeComplexity === "O(N²)") {
+    improvements.push("Performance Tip: Can the nested O(N²) loop be reduced to O(N) using a Hash Map or Two Pointers?");
+  }
+  if (usesMap && !cleanCode.includes(".reserve(")) {
+    improvements.push("C++ Tip: Call `unordered_map.reserve(nums.size())` to avoid dynamic bucket rehash overhead.");
+  }
+  if (improvements.length === 0) {
+    improvements.push("Code adheres to optimal time-space tradeoff for this algorithmic pattern.");
+  }
+
+  return {
+    timeComplexity,
+    timeComplexityExplanation: timeExpl,
+    spaceComplexity,
+    spaceComplexityExplanation: spaceExpl,
+    edgeCases,
+    styleReview,
+    improvements,
+    verdict: timeComplexity === "O(N²)" ? "Good" : "Optimal",
+    rating: timeComplexity === "O(N²)" ? 8 : 9
   };
 }

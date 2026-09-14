@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>DSA Pattern Finder</title>
+  <title>DSA Pattern Finder & AI Review</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -12,10 +12,12 @@
       --text-muted: #94a3b8;
       --border: #334155;
       --success: #34d399;
+      --warning: #fbbf24;
+      --danger: #f87171;
     }
 
     body {
-      width: 380px;
+      width: 400px;
       margin: 0;
       padding: 16px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -30,7 +32,7 @@
       justify-content: space-between;
       border-bottom: 1px solid var(--border);
       padding-bottom: 10px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
 
     .title {
@@ -46,6 +48,33 @@
       border-radius: 12px;
       background-color: var(--border);
       color: var(--text-muted);
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      background-color: var(--card-bg);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background-color: var(--accent);
+      color: #0f172a;
+      border-color: var(--accent);
     }
 
     .card {
@@ -76,8 +105,8 @@
     }
 
     .section-title {
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 12px;
+      font-weight: 700;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -85,14 +114,14 @@
       margin-bottom: 6px;
     }
 
-    .socratic-list, .steps-list {
+    .socratic-list, .steps-list, .review-list {
       margin: 0;
       padding-left: 18px;
       font-size: 13px;
       line-height: 1.5;
     }
 
-    .socratic-list li {
+    .socratic-list li, .review-list li {
       margin-bottom: 6px;
       color: #e2e8f0;
     }
@@ -114,10 +143,74 @@
       background-color: #7dd3fc;
     }
 
+    .btn-secondary {
+      background-color: #334155;
+      color: #f8fafc;
+      margin-bottom: 8px;
+    }
+
+    .btn-secondary:hover {
+      background-color: #475569;
+    }
+
     .error-box {
       color: #f87171;
       font-size: 12px;
       margin-top: 8px;
+    }
+
+    /* Complexity Badges */
+    .complexity-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .complexity-badge {
+      flex: 1;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 8px;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .complexity-val {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .complexity-label {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .verdict-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .tag-optimal { background: rgba(52, 211, 153, 0.2); color: var(--success); }
+    .tag-good { background: rgba(251, 191, 36, 0.2); color: var(--warning); }
+    .tag-refactor { background: rgba(248, 113, 113, 0.2); color: var(--danger); }
+
+    textarea {
+      width: 100%;
+      height: 90px;
+      background: #090d16;
+      border: 1px solid var(--border);
+      color: #e2e8f0;
+      font-family: monospace;
+      font-size: 11px;
+      padding: 8px;
+      border-radius: 6px;
+      box-sizing: border-box;
+      resize: vertical;
+      margin-bottom: 8px;
     }
   </style>
 </head>
@@ -127,32 +220,87 @@
     <span id="tab-slug" class="status-badge">Detecting...</span>
   </div>
 
-  <div id="result-container" style="display: none;">
-    <div class="card">
-      <div class="pattern-header">
-        <span id="pattern-name" class="pattern-name">--</span>
-        <span id="confidence" class="confidence">0%</span>
+  <div class="tabs">
+    <button id="tab-pattern-btn" class="tab-btn active">🎯 Pattern & Socratic</button>
+    <button id="tab-review-btn" class="tab-btn">🤖 AI Code Review</button>
+  </div>
+
+  <!-- Tab 1: Pattern Detection & Socratic Guidance -->
+  <div id="tab-pattern">
+    <div id="result-container" style="display: none;">
+      <div class="card">
+        <div class="pattern-header">
+          <span id="pattern-name" class="pattern-name">--</span>
+          <span id="confidence" class="confidence">0%</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">💡 Socratic Interview Questions</div>
+        <ol id="socratic-questions" class="socratic-list"></ol>
+      </div>
+
+      <div class="card">
+        <div class="section-title">📝 Algorithmic Solution Steps</div>
+        <ol id="thinking-steps" class="steps-list"></ol>
       </div>
     </div>
 
-    <div class="card">
-      <div class="section-title">💡 Socratic Interview Questions</div>
-      <ol id="socratic-questions" class="socratic-list"></ol>
+    <div id="loading" class="card" style="text-align: center; color: var(--text-muted); display: none;">
+      Analyzing current problem...
     </div>
 
-    <div class="card">
-      <div class="section-title">📝 Algorithmic Solution Steps</div>
-      <ol id="thinking-steps" class="steps-list"></ol>
-    </div>
+    <button id="analyze-btn" class="btn" style="margin-top: 6px;">Analyze Problem</button>
   </div>
 
-  <div id="loading" class="card" style="text-align: center; color: var(--text-muted);">
-    Analyzing current problem...
+  <!-- Tab 2: AI Code Review -->
+  <div id="tab-review" style="display: none;">
+    <button id="fetch-sub-btn" class="btn btn-secondary">⚡ Capture Accepted Solution (LeetCode API)</button>
+    <textarea id="code-input" placeholder="Or paste solution code here to review..."></textarea>
+    <button id="review-btn" class="btn">Review Code</button>
+
+    <div id="review-loading" class="card" style="text-align: center; color: var(--text-muted); display: none; margin-top: 10px;">
+      Running AI Complexity & Code Review...
+    </div>
+
+    <div id="review-result-container" style="display: none; margin-top: 12px;">
+      <div class="card">
+        <div class="pattern-header">
+          <span id="review-verdict" class="verdict-tag tag-optimal">Optimal</span>
+          <span id="review-rating" class="confidence">Score: 9/10</span>
+        </div>
+
+        <div class="complexity-row" style="margin-top: 10px;">
+          <div class="complexity-badge">
+            <div id="time-comp" class="complexity-val">O(N)</div>
+            <div class="complexity-label">Time Complexity</div>
+          </div>
+          <div class="complexity-badge">
+            <div id="space-comp" class="complexity-val">O(1)</div>
+            <div class="complexity-label">Space Complexity</div>
+          </div>
+        </div>
+        <p id="complexity-explanation" style="font-size: 12px; color: var(--text-muted); margin: 4px 0 0 0;"></p>
+      </div>
+
+      <div class="card">
+        <div class="section-title">🛡️ Edge Cases Analysis</div>
+        <ul id="edge-cases-list" class="review-list"></ul>
+      </div>
+
+      <div class="card">
+        <div class="section-title">✨ Clean Code & Style Review</div>
+        <ul id="style-review-list" class="review-list"></ul>
+      </div>
+
+      <div class="card">
+        <div class="section-title">🚀 Optimization Recommendations</div>
+        <ul id="improvements-list" class="review-list"></ul>
+      </div>
+    </div>
   </div>
 
   <div id="error" class="error-box" style="display: none;"></div>
-
-  <button id="analyze-btn" class="btn" style="margin-top: 10px;">Analyze Problem</button>
 
   <script type="module" src="popup.js"></script>
 </body>
