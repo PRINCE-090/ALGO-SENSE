@@ -13,8 +13,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Tab elements
   const tabPatternBtn = document.getElementById("tab-pattern-btn");
   const tabReviewBtn = document.getElementById("tab-review-btn");
+  const tabGithubBtn = document.getElementById("tab-github-btn");
+
   const tabPatternSection = document.getElementById("tab-pattern");
   const tabReviewSection = document.getElementById("tab-review");
+  const tabGithubSection = document.getElementById("tab-github");
 
   // Code Review elements
   const fetchSubBtn = document.getElementById("fetch-sub-btn");
@@ -23,26 +26,42 @@ document.addEventListener("DOMContentLoaded", async () => {
   const reviewLoadingEl = document.getElementById("review-loading");
   const reviewResultContainer = document.getElementById("review-result-container");
 
+  // GitHub elements
+  const connectGithubBtn = document.getElementById("connect-github-btn");
+  const deviceFlowInfo = document.getElementById("device-flow-info");
+  const userCodeDisplay = document.getElementById("user-code-display");
+  const verifyLink = document.getElementById("verify-link");
+  const githubDisconnected = document.getElementById("github-disconnected");
+  const githubConnected = document.getElementById("github-connected");
+  const githubAvatar = document.getElementById("github-avatar");
+  const githubUsername = document.getElementById("github-username");
+  const disconnectGithubBtn = document.getElementById("disconnect-github-btn");
+  const githubSyncCard = document.getElementById("github-sync-card");
+  const githubRepoInput = document.getElementById("github-repo-input");
+  const syncSolutionBtn = document.getElementById("sync-solution-btn");
+  const syncStatus = document.getElementById("sync-status");
+
   let activeUrl = "";
   let extractedSlug = "";
   let currentPattern = "";
+  let latestReviewData = null;
+  let githubPollTimer = null;
 
   // Tab Navigation Handling
-  tabPatternBtn.addEventListener("click", () => {
-    tabPatternBtn.classList.add("active");
-    tabReviewBtn.classList.remove("active");
-    tabPatternSection.style.display = "block";
-    tabReviewSection.style.display = "none";
-    hideError();
-  });
+  function switchTab(activeBtn, activeSection) {
+    [tabPatternBtn, tabReviewBtn, tabGithubBtn].forEach(btn => btn?.classList.remove("active"));
+    [tabPatternSection, tabReviewSection, tabGithubSection].forEach(sec => {
+      if (sec) sec.style.display = "none";
+    });
 
-  tabReviewBtn.addEventListener("click", () => {
-    tabReviewBtn.classList.add("active");
-    tabPatternBtn.classList.remove("active");
-    tabPatternSection.style.display = "none";
-    tabReviewSection.style.display = "block";
+    activeBtn.classList.add("active");
+    activeSection.style.display = "block";
     hideError();
-  });
+  }
+
+  tabPatternBtn.addEventListener("click", () => switchTab(tabPatternBtn, tabPatternSection));
+  tabReviewBtn.addEventListener("click", () => switchTab(tabReviewBtn, tabReviewSection));
+  tabGithubBtn.addEventListener("click", () => switchTab(tabGithubBtn, tabGithubSection));
 
   // Query active tab URL
   try {
@@ -74,6 +93,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   } catch (err) {
     slugBadge.textContent = "URL Error";
+  }
+
+  // Check stored GitHub authentication state
+  try {
+    const { github_token, github_user } = await chrome.storage.local.get(["github_token", "github_user"]);
+    if (github_token && github_user) {
+      showGitHubConnected(github_user);
+    }
+  } catch (e) {
+    // Storage read fallback
   }
 
   // Run Pattern Analysis
@@ -165,13 +194,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       fetchSubBtn.textContent = "Fetching Accepted Solution...";
       fetchSubBtn.disabled = true;
 
-      // Query user's accepted submission using authenticated browser session
       const submission = await fetchAcceptedSubmissionFromLeetCode(extractedSlug);
 
       if (submission && submission.code) {
         codeInput.value = submission.code;
         fetchSubBtn.textContent = `✅ Captured Accepted Solution (${submission.language})`;
-        // Automatically trigger review
         runCodeReview(submission.code, submission.language);
       } else {
         throw new Error("No accepted submission found. Ensure you have submitted code on LeetCode.");
@@ -199,7 +226,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       let reviewData = null;
 
-      // 1. Try backend /review endpoint
       try {
         const res = await fetch(`${API_BASE_URL}/review`, {
           method: "POST",
@@ -220,11 +246,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.log("[AI Review] Local server offline, running client-side code review analyzer...");
       }
 
-      // 2. Client-side deterministic code review fallback
       if (!reviewData) {
         reviewData = analyzeCodeClientSide(code, currentPattern);
       }
 
+      latestReviewData = reviewData;
       renderReviewResults(reviewData);
     } catch (err) {
       showError(`Code review failed: ${err.message}`);
@@ -278,6 +304,144 @@ document.addEventListener("DOMContentLoaded", async () => {
     reviewResultContainer.style.display = "block";
   }
 
+  // --- GitHub OAuth Device Flow ---
+  connectGithubBtn.addEventListener("click", async () => {
+    try {
+      hideError();
+      connectGithubBtn.textContent = "Requesting Device Code...";
+      connectGithubBtn.disabled = true;
+
+      const res = await fetch(`${API_BASE_URL}/api/github/device-code`, {
+        method: "POST"
+      });
+
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+
+      const data = await res.json();
+      userCodeDisplay.textContent = data.user_code;
+      verifyLink.href = data.verification_uri || "https://github.com/login/device";
+      deviceFlowInfo.style.display = "block";
+
+      // Poll for authorization
+      pollGitHubToken(data.device_code, data.interval || 5);
+    } catch (err) {
+      showError(`GitHub Device Flow error: ${err.message}`);
+      connectGithubBtn.textContent = "Connect with GitHub";
+      connectGithubBtn.disabled = false;
+    }
+  });
+
+  async function pollGitHubToken(deviceCode, intervalSec) {
+    if (githubPollTimer) clearInterval(githubPollTimer);
+
+    githubPollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/github/poll-token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ device_code: deviceCode })
+        });
+
+        const data = await res.json();
+
+        if (data.access_token) {
+          clearInterval(githubPollTimer);
+          const userRes = await fetch(`${API_BASE_URL}/api/github/user`, {
+            headers: { Authorization: `Bearer ${data.access_token}` }
+          });
+          const user = await userRes.json();
+
+          await chrome.storage.local.set({
+            github_token: data.access_token,
+            github_user: user
+          });
+
+          showGitHubConnected(user);
+        } else if (data.error && data.error !== "authorization_pending") {
+          clearInterval(githubPollTimer);
+          showError(`GitHub Auth Error: ${data.error_description || data.error}`);
+          deviceFlowInfo.style.display = "none";
+          connectGithubBtn.disabled = false;
+        }
+      } catch (e) {
+        // Continue polling
+      }
+    }, (intervalSec || 5) * 1000);
+  }
+
+  function showGitHubConnected(user) {
+    githubDisconnected.style.display = "none";
+    githubConnected.style.display = "block";
+    githubSyncCard.style.display = "block";
+
+    githubAvatar.src = user.avatar_url || "https://github.com/ghost.png";
+    githubUsername.textContent = `@${user.login || user.name}`;
+  }
+
+  disconnectGithubBtn.addEventListener("click", async () => {
+    await chrome.storage.local.remove(["github_token", "github_user"]);
+    githubConnected.style.display = "none";
+    githubSyncCard.style.display = "none";
+    githubDisconnected.style.display = "block";
+    deviceFlowInfo.style.display = "none";
+    connectGithubBtn.textContent = "Connect with GitHub";
+    connectGithubBtn.disabled = false;
+  });
+
+  // --- Auto-Commit via Contents API ---
+  syncSolutionBtn.addEventListener("click", async () => {
+    const code = codeInput.value;
+    if (!code || !code.trim()) {
+      showError("Please capture or enter your solution code before syncing.");
+      return;
+    }
+
+    try {
+      hideError();
+      syncStatus.style.display = "block";
+      syncStatus.textContent = "Syncing code and notes to GitHub...";
+      syncStatus.style.color = "var(--accent)";
+      syncSolutionBtn.disabled = true;
+
+      const { github_token, github_user } = await chrome.storage.local.get(["github_token", "github_user"]);
+      if (!github_token) {
+        showError("Please connect your GitHub account first.");
+        return;
+      }
+
+      const repo = githubRepoInput.value.trim() || "leetcode-solutions";
+
+      const res = await fetch(`${API_BASE_URL}/api/github/sync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${github_token}`
+        },
+        body: JSON.stringify({
+          owner: github_user?.login || "me",
+          repo,
+          slug: extractedSlug,
+          title: extractedSlug.replace(/-/g, " "),
+          language: "cpp",
+          code,
+          review: latestReviewData,
+          pattern: currentPattern
+        })
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Sync failed");
+
+      syncStatus.innerHTML = `✅ Successfully synced solution to <b>${repo}</b>!`;
+      syncStatus.style.color = "var(--success)";
+    } catch (err) {
+      syncStatus.textContent = `Sync failed: ${err.message}`;
+      syncStatus.style.color = "var(--danger)";
+    } finally {
+      syncSolutionBtn.disabled = false;
+    }
+  });
+
   function showLoading(isLoading) {
     loadingEl.style.display = isLoading ? "block" : "none";
     if (isLoading) resultContainer.style.display = "none";
@@ -324,7 +488,7 @@ async function fetchAcceptedSubmissionFromLeetCode(slug) {
   const listRes = await fetch("https://leetcode.com/graphql", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    credentials: "include", // Uses active browser cookies
+    credentials: "include",
     body: JSON.stringify({
       query: `
         query questionSubmissionList($questionSlug: String!, $offset: Int!, $limit: Int!) {
@@ -355,7 +519,6 @@ async function fetchAcceptedSubmissionFromLeetCode(slug) {
     throw new Error("No recent submission found on LeetCode for this problem.");
   }
 
-  // Fetch full source code
   const detailRes = await fetch("https://leetcode.com/graphql", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

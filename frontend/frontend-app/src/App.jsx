@@ -1,9 +1,11 @@
 import { useState } from "react";
 import axios from "axios";
+import AnalyticsDashboard from "./components/AnalyticsDashboard";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 function App() {
+  const [activeTab, setActiveTab] = useState("analyzer");
   const [problem, setProblem] = useState("");
   const [url, setUrl] = useState("");
   const [result, setResult] = useState(null);
@@ -117,32 +119,74 @@ function App() {
     <div style={styles.container}>
       <h1 style={styles.title}>DSA Pattern Finder</h1>
 
-      <textarea
-        style={styles.textarea}
-        placeholder="Enter DSA problem..."
-        value={problem}
-        onChange={(e) => setProblem(e.target.value)}
-      />
+      {/* Navigation Tabs */}
+      <div style={{ display: "flex", gap: "12px", marginBottom: "25px" }}>
+        <button
+          onClick={() => setActiveTab("analyzer")}
+          style={{
+            padding: "10px 22px",
+            borderRadius: "24px",
+            border: "1px solid rgba(255,255,255,0.25)",
+            background: activeTab === "analyzer" ? "#fff" : "rgba(255,255,255,0.15)",
+            color: activeTab === "analyzer" ? "#0f172a" : "#fff",
+            fontWeight: "bold",
+            cursor: "pointer",
+            fontSize: "14px",
+            transition: "0.2s"
+          }}
+        >
+          🎯 Pattern Analyzer
+        </button>
+        <button
+          onClick={() => setActiveTab("analytics")}
+          style={{
+            padding: "10px 22px",
+            borderRadius: "24px",
+            border: "1px solid rgba(255,255,255,0.25)",
+            background: activeTab === "analytics" ? "#fff" : "rgba(255,255,255,0.15)",
+            color: activeTab === "analytics" ? "#0f172a" : "#fff",
+            fontWeight: "bold",
+            cursor: "pointer",
+            fontSize: "14px",
+            transition: "0.2s"
+          }}
+        >
+          📈 Pattern Mastery Dashboard
+        </button>
+      </div>
 
-      <input
-        type="text"
-        placeholder="Paste LeetCode URL"
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        style={styles.input}
-      />
+      {activeTab === "analytics" ? (
+        <div style={{ width: "100%", maxWidth: "1050px" }}>
+          <AnalyticsDashboard />
+        </div>
+      ) : (
+        <>
+          <textarea
+            style={styles.textarea}
+            placeholder="Enter DSA problem..."
+            value={problem}
+            onChange={(e) => setProblem(e.target.value)}
+          />
 
-      <button
-        style={styles.button}
-        onClick={handleAnalyze}
-        disabled={loading}
-        onMouseOver={(e) => (e.target.style.opacity = 0.8)}
-        onMouseOut={(e) => (e.target.style.opacity = 1)}
-        onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-        onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-      >
-        {loading ? "Analyzing..." : "Analyze"}
-      </button>
+          <input
+            type="text"
+            placeholder="Paste LeetCode URL"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            style={styles.input}
+          />
+
+          <button
+            style={styles.button}
+            onClick={handleAnalyze}
+            disabled={loading}
+            onMouseOver={(e) => (e.target.style.opacity = 0.8)}
+            onMouseOut={(e) => (e.target.style.opacity = 1)}
+            onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
+            onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
+          >
+            {loading ? "Analyzing..." : "Analyze"}
+          </button>
 
       {error && <p style={{ color: "#ffb3b3" }}>{error}</p>}
 
@@ -230,6 +274,8 @@ function App() {
             ))}
           </ol>
         </div>
+      )}
+        </>
       )}
     </div>
   );
