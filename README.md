@@ -1,4 +1,4 @@
-# DSA Pattern Finder
+# ALGO SENSE
 
 A production-grade, dual-engine algorithmic pattern classification platform. It analyzes Data Structures & Algorithms (DSA) problem statements or LeetCode problem URLs, classifies the core underlying pattern (e.g., Binary Search, Two Pointers, Sliding Window, Dynamic Programming, Graph, Backtracking, Greedy, Prefix Sum), computes pattern probability distributions, and provides step-by-step resolution guidance.
 
